@@ -2,34 +2,29 @@
 {
 	using System;
 	using System.IdentityModel.Tokens.Jwt;
-	using System.Linq;
-	using System.Security.Claims;
-	using System.Text;
 	using System.Threading.Tasks;
 	using Infrastructure.Entities;
+	using Interfaces;
 	using Microsoft.AspNetCore.Identity;
 	using Microsoft.AspNetCore.Mvc;
 	using Microsoft.Extensions.Configuration;
 	using Microsoft.Extensions.Logging;
-	using Microsoft.IdentityModel.Tokens;
 	using Models.RequestModels;
 
-	public class AuthController : Controller
+	public class AuthController : BaseController
 	{
 		private readonly ILogger<AuthController> _logger;
-		private readonly SignInManager<ApplicationUser> _signInManager;
 		private readonly UserManager<ApplicationUser> _userManager;
-		private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 		private readonly IConfiguration _config;
+		private readonly IAuthService _authService;
 
-		public AuthController(ILogger<AuthController> logger, SignInManager<ApplicationUser> signInManager,
-			UserManager<ApplicationUser> userManager, IPasswordHasher<ApplicationUser> passwordHasher, IConfiguration config)
+		public AuthController(ILogger<AuthController> logger, UserManager<ApplicationUser> userManager,
+			IConfiguration config, IAuthService authService)
 		{
 			_logger = logger;
-			_signInManager = signInManager;
 			_userManager = userManager;
-			_passwordHasher = passwordHasher;
 			_config = config;
+			_authService = authService;
 		}
 
 		[HttpPost("api/auth/token")]
@@ -37,41 +32,28 @@
 		{
 			try
 			{
-				var user = await _userManager.FindByNameAsync(model.Username);
-				if (user != null)
+				var user = await _authService.GetUserByUsernameOrEmail(model.Username, _userManager);
+				if (user == null)
 				{
-					if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash, model.Password) ==
-					    PasswordVerificationResult.Success)
-					{
-						var userClaims = await _userManager.GetClaimsAsync(user);
-						var claims = new[]
-						{
-							new Claim(ClaimTypes.Name, user.UserName),
-							new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-							new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-							new Claim(JwtRegisteredClaimNames.GivenName, user.UserName ),
-							new Claim(JwtRegisteredClaimNames.FamilyName, user.UserName),
-							new Claim(JwtRegisteredClaimNames.Email, user.Email),
-						}.Union(userClaims);
-						var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Tokens:Key"]));
-						var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-						var token = new JwtSecurityToken(
-							_config["Tokens:Issuer"],
-							_config["Tokens:Audience"],
-							claims,
-							expires: DateTime.UtcNow.AddMinutes(15),
-							signingCredentials: creds);
-						return Ok(new
-						{
-							token = new JwtSecurityTokenHandler().WriteToken(token),
-							expiration = token.ValidTo
-						});
-					}
+					_logger.LogWarning($"Login failure for {model.Username}. No user exists with this username or email address.");
+					return BadRequest("Invalid username or password.");
 				}
+				var verificationResult = await _userManager.CheckPasswordAsync(user, model.Password);
+				if (!verificationResult)
+				{
+					_logger.LogWarning($"Login failure for {model.Username}. Error validating password.");
+					return BadRequest("Invalid username or password.");
+				}
+				var jwt = await _authService.GenerateJwt(user, _config["Tokens:Key"], _config["Tokens:Issuer"], _config["Tokens:Audience"], _userManager);
+				return Ok(new
+				{
+					token = new JwtSecurityTokenHandler().WriteToken(jwt),
+					expiration = jwt.ValidTo
+				});
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError($"Error while creating JWT: {ex}");
+				_logger.LogError(default(EventId), ex, $"Error creating JWT: {ex.Message}");
 			}
 			return BadRequest("Failed to create JWT.");
 		}
@@ -85,7 +67,7 @@
 				try
 				{
 					var result = await _userManager.CreateAsync(user, model.Password);
-					var roleResult = await _userManager.AddToRoleAsync(user, "Admin");
+					var roleResult = await _userManager.AddToRoleAsync(user, "User");
 					if (result.Succeeded && roleResult.Succeeded)
 					{
 						_logger.LogInformation(3, "User created a new account with password.");

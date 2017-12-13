@@ -1,6 +1,6 @@
-﻿namespace RPThreadTrackerV3.Models.DomainModels
+﻿namespace ApiBoilerplate.Models.ViewModels
 {
-	public class User
+	public class UserDto
 	{
 		public string Id { get; set; }
 		public string UserName { get; set; }
