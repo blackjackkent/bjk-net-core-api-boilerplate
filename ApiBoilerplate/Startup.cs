@@ -17,6 +17,7 @@
 	using Microsoft.Extensions.Logging;
 	using Microsoft.IdentityModel.Tokens;
 	using NLog;
+	using NLog.Config;
 	using NLog.Extensions.Logging;
 	using NLog.Web;
 
@@ -77,6 +78,7 @@
 				builder.WithOrigins(Configuration["CorsUrl"]).AllowAnyHeader().AllowAnyMethod());
 			app.UseMvc();
 			LogManager.Configuration.Variables["connectionString"] = Configuration["Data:ConnectionString"];
+			LogManager.Configuration.Install(new InstallationContext());
 		}
 	}
 }

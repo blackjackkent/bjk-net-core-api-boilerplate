@@ -1,7 +1,6 @@
 ﻿namespace ApiBoilerplate
 {
 	using System;
-	using Infrastructure.Entities;
 	using Infrastructure.Seeders;
 	using Microsoft.AspNetCore;
 	using Microsoft.AspNetCore.Hosting;
@@ -24,8 +23,8 @@
 				{
 					IHostingEnvironment env = builderContext.HostingEnvironment;
 					config.Sources.Clear();
-					config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-						.AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true);
+					config.AddJsonFile("appsettings.json", false, true)
+						.AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true);
 				})
 				.UseStartup<Startup>()
 				.Build();
