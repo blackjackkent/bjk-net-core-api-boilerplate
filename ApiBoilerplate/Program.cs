@@ -1,14 +1,21 @@
 ﻿namespace ApiBoilerplate
 {
+	using System;
+	using Infrastructure.Entities;
+	using Infrastructure.Seeders;
 	using Microsoft.AspNetCore;
 	using Microsoft.AspNetCore.Hosting;
 	using Microsoft.Extensions.Configuration;
+	using Microsoft.Extensions.DependencyInjection;
+	using Microsoft.Extensions.Logging;
 
 	public class Program
 	{
 		public static void Main(string[] args)
 		{
-			BuildWebHost(args).Run();
+			var host = BuildWebHost(args);
+			SeedDatabase(host);
+			host.Run();
 		}
 
 		public static IWebHost BuildWebHost(string[] args) =>
@@ -22,5 +29,23 @@
 				})
 				.UseStartup<Startup>()
 				.Build();
+
+		private static void SeedDatabase(IWebHost host)
+		{
+			using (var scope = host.Services.CreateScope())
+			{
+				var services = scope.ServiceProvider;
+				try
+				{
+					var roleInitializer = services.GetRequiredService<RoleInitializer>();
+					roleInitializer.Seed().Wait();
+				}
+				catch (Exception ex)
+				{
+					var logger = services.GetRequiredService<ILogger<Program>>();
+					logger.LogError(ex, "An error occurred while migrating the database.");
+				}
+			}
+		}
 	}
 }

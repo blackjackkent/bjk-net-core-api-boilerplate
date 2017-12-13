@@ -1,4 +1,4 @@
-﻿namespace RPThreadTrackerV3.Models.DomainModels
+﻿namespace ApiBoilerplate.Models.DomainModels
 {
 	public class User
 	{

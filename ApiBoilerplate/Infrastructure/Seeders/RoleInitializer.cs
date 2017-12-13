@@ -18,14 +18,17 @@
 
 		public async Task Seed()
 		{
-
+			var userRole = await _roleManager.FindByNameAsync("User");
+			if (userRole == null)
+			{
+				userRole = new IdentityRole("User");
+				await _roleManager.CreateAsync(userRole);
+			}
 			var adminRole = await _roleManager.FindByNameAsync("Admin");
 			if (adminRole == null)
 			{
 				adminRole = new IdentityRole("Admin");
 				await _roleManager.CreateAsync(adminRole);
-
-				await _roleManager.AddClaimAsync(adminRole, new Claim("Permission", "manage-locations"));
 			}
 		}
 	}
